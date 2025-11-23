@@ -10,6 +10,8 @@ modules: [
       resolve: "@medusajs/medusa/payment",
       options: {
         providers: [
+
+
           {
             resolve: "@medusajs/medusa/payment-stripe",
             id: "stripe",
@@ -17,17 +19,20 @@ modules: [
               apiKey: process.env.STRIPE_API_KEY,
             },
           },
+
+
         ],
       },
     },
+    
   ],
 
 
 
 
   projectConfig: {
-    databaseUrl: process.env.DATABASE_URL,
-    redisUrl: process.env.REDIS_URL,
+  databaseUrl: process.env.EXTERNAL_DATABASE_URL,
+  //redisUrl: process.env.EXTERNAL_REDIS_URL,
     http: {
       storeCors: process.env.STORE_CORS!,
       adminCors: process.env.ADMIN_CORS!,

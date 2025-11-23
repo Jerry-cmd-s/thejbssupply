@@ -11,6 +11,7 @@ For example, create the file `src/subscribers/product-created.ts` with the follo
 ```ts
 import {
   type SubscriberConfig,
+   SubscriberArgs,
 } from "@medusajs/framework"
 
 // subscriber function
