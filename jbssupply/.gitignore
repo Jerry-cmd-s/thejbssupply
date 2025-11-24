@@ -1,21 +1,26 @@
+# Build outputs
 /dist
-.env
-.DS_Store
-/uploads
-/node_modules
-yarn-error.log
-
-.idea
-
-coverage
-
-!src/**
-
-./tsconfig.tsbuildinfo
-medusa-db.sql
-build
+/build
+.medusa
 .cache
 
+# Environment & system artifacts
+.env
+.DS_Store
+medusa-db.sql
+coverage
+yarn-error.log
+.idea
+./tsconfig.tsbuildinfo
+
+# File uploads
+/uploads
+
+# Dependencies
+/node_modules
+/package-lock.json
+
+# Yarn berry directories (ignore all except required dirs)
 .yarn/*
 !.yarn/patches
 !.yarn/plugins
@@ -23,4 +28,5 @@ build
 !.yarn/sdks
 !.yarn/versions
 
-.medusa
+# Keep source files
+!src/**
