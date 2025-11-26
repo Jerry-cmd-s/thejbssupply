@@ -18,7 +18,7 @@ yarn-error.log
 
 # Dependencies
 /node_modules
-/package-lock.json
+
 
 # Yarn berry directories (ignore all except required dirs)
 .yarn/*
