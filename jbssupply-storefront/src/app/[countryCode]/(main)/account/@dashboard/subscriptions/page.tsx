@@ -1,10 +1,10 @@
 "use client"
 
 import { useState } from "react"
-import { Button, Heading, Input } from "@medusajs/ui"
+import { Button, Heading } from "@medusajs/ui"
 import { Package } from "lucide-react"
 
-// Sample products — replace with API fetch in the future
+// Sample product list — you can fetch from your Medusa backend later
 const products = [
   { id: "p1", name: "Eco Utensils Set", price: 15 },
   { id: "p2", name: "Starter Kit", price: 50 },
@@ -14,38 +14,25 @@ const products = [
 ]
 
 export default function BuildBundle() {
-  const [bundleName, setBundleName] = useState("")
-  const [bundleProducts, setBundleProducts] = useState<string[]>([])
+  const [bundle, setBundle] = useState<string[]>([])
 
   const toggleProduct = (id: string) => {
-    setBundleProducts((prev) =>
+    setBundle((prev) =>
       prev.includes(id) ? prev.filter((pid) => pid !== id) : [...prev, id]
     )
   }
 
-  const totalPrice = bundleProducts
+  const totalPrice = bundle
     .map((id) => products.find((p) => p.id === id)?.price || 0)
     .reduce((a, b) => a + b, 0)
 
-  const handleSaveBundle = () => {
-    if (!bundleName) {
-      alert("Please enter a name for your bundle.")
-      return
-    }
-    if (bundleProducts.length === 0) {
-      alert("Please select at least one product.")
-      return
-    }
-
+  const handleCheckout = () => {
     alert(
-      `Bundle Created!\nName: ${bundleName}\nProducts: ${bundleProducts
+      `Bundle Created! Products: ${bundle
         .map((id) => products.find((p) => p.id === id)?.name)
-        .join(", ")}\nTotal Price: $${totalPrice}`
+        .join(", ")} | Total Price: $${totalPrice}`
     )
-
-    // Future: Send bundle to cart or subscription API
-    setBundleName("")
-    setBundleProducts([])
+    // In future: send bundle to cart / subscription API
   }
 
   return (
@@ -54,25 +41,16 @@ export default function BuildBundle() {
         <Package size={28} /> Build Your Bundle
       </Heading>
 
-      <p className="mb-4 text-gray-700">
-        Name your bundle and select the products you want to include. You can later convert it to a subscription.
+      <p className="mb-6 text-gray-700">
+        Select the products you want to include in your custom bundle. Later, you can turn this bundle into a subscription.
       </p>
 
-      {/* Bundle name input */}
-      <Input
-        placeholder="Enter your bundle name"
-        value={bundleName}
-        onChange={(e) => setBundleName(e.target.value)}
-        className="mb-6"
-      />
-
-      {/* Product selection grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 mb-6">
         {products.map((product) => (
           <div
             key={product.id}
             className={`p-4 border rounded-lg cursor-pointer hover:shadow-lg transition-all ${
-              bundleProducts.includes(product.id)
+              bundle.includes(product.id)
                 ? "border-blue-600 bg-blue-50"
                 : "border-gray-300 bg-white"
             }`}
@@ -84,16 +62,15 @@ export default function BuildBundle() {
         ))}
       </div>
 
-      {/* Summary and Save */}
-      <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
+      <div className="flex justify-between items-center">
         <span className="font-semibold text-lg">Total: ${totalPrice}</span>
         <Button
           variant="primary"
           size="large"
-          onClick={handleSaveBundle}
-          disabled={!bundleName || bundleProducts.length === 0}
+          onClick={handleCheckout}
+          disabled={bundle.length === 0}
         >
-          Save Bundle
+          Add Bundle to Cart
         </Button>
       </div>
     </div>
