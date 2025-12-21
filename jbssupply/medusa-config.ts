@@ -31,6 +31,8 @@ module.exports = defineConfig({
 
 
 modules: [
+
+  /////////Stripe PAYMENT SYSTEM
     {
       resolve: "@medusajs/medusa/payment",
       options: {
@@ -50,7 +52,32 @@ modules: [
         ],
       },
     },
-    
+
+
+
+/////////Alvara tax
+
+
+///////////////////////SENDGRID 
+  {
+      resolve: "@medusajs/medusa/notification",
+      options: {
+        providers: [
+          // ...
+          {
+            resolve: "@medusajs/medusa/notification-sendgrid",
+            id: "sendgrid",
+            options: {
+              channels: ["email"],
+              api_key: process.env.SENDGRID_API_KEY,
+              from: process.env.SENDGRID_FROM,
+            },
+          },
+        ],
+      },
+    },
+
+
   ],
 
 

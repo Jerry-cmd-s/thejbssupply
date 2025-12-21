@@ -1,18 +1,27 @@
-"use server"
-
 // src/lib/util/bundleUtils.ts
 import { v4 as uuidv4 } from 'uuid';
 import type { Bundle, BundleItem } from 'types/bundle';
-import { getAuthHeaders } from "lib/data/cookies"; // ← same as in orders.ts
+
+// Get the medusa_jwt cookie from the browser
+const getJwtCookie = () => {
+  if (typeof document === 'undefined') return '';
+  const match = document.cookie.match(new RegExp('(^| )medusa_jwt=([^;]+)'));
+  return match ? match[2] : '';
+};
+
+const getHeaders = () => {
+  const jwt = getJwtCookie();
+  return jwt ? { Authorization: `Bearer ${jwt}` } : {};
+};
 
 export async function saveBundle(sdk: any, name: string, items: BundleItem[]) {
-  const headers = await getAuthHeaders();
+  const headers = getHeaders();
 
   try {
     const { customer } = await sdk.store.customer.retrieve({}, { headers });
 
     if (!customer) {
-      throw new Error('No logged-in customer found');
+      throw new Error('No logged-in customer found. Please log in again.');
     }
 
     const existingBundles: Bundle[] = (customer.metadata?.bundles as Bundle[]) || [];
@@ -42,7 +51,7 @@ export async function saveBundle(sdk: any, name: string, items: BundleItem[]) {
 }
 
 export async function getSavedBundles(sdk: any): Promise<Bundle[]> {
-  const headers = await getAuthHeaders();
+  const headers = getHeaders();
 
   try {
     const { customer } = await sdk.store.customer.retrieve({}, { headers });
@@ -54,7 +63,7 @@ export async function getSavedBundles(sdk: any): Promise<Bundle[]> {
 }
 
 export async function deleteBundle(sdk: any, bundleId: string) {
-  const headers = await getAuthHeaders();
+  const headers = getHeaders();
 
   try {
     const { customer } = await sdk.store.customer.retrieve({}, { headers });
