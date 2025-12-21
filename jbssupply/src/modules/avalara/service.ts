@@ -109,7 +109,8 @@ async getTaxLines(
           },
         },
         currencyCode,
-        type: DocumentType.SalesOrder,
+      //  type: "SalesOrder" as DocumentType,
+
       })
 
 

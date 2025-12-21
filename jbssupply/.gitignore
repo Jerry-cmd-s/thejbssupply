@@ -30,3 +30,5 @@ yarn-error.log
 
 # Keep source files
 !src/**
+
+/alvara
