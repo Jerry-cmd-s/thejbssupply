@@ -44,6 +44,7 @@ modules: [
             id: "stripe",
             options: {
               apiKey: process.env.STRIPE_API_KEY,
+              capture: true,
               webhookSecret:process.env.STRIPE_WEBHOOK_SECRET,
             },
           },
