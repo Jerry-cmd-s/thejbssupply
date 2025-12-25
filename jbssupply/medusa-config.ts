@@ -1,13 +1,5 @@
 import { loadEnv, defineConfig } from '@medusajs/framework/utils'
-
 loadEnv(process.env.NODE_ENV || 'development', process.cwd())
-
-
-
-
-
-
-
 const plugins = [
   // ...,
   {
@@ -15,7 +7,7 @@ const plugins = [
     options: {
       api_key: process.env.SENDGRID_API_KEY,
       from: process.env.SENDGRID_FROM,
-      order_placed_template: 
+      order_placed_template:
         process.env.SENDGRID_ORDER_PLACED_ID,
       localization: {
         "de-DE": { // locale key
@@ -26,41 +18,28 @@ const plugins = [
     },
   },
 ]
-
 module.exports = defineConfig({
-
-
-modules: [
-
-  /////////Stripe PAYMENT SYSTEM
+  modules: [
+    // ... other config
+    /////////Stripe PAYMENT SYSTEM
     {
       resolve: "@medusajs/medusa/payment",
       options: {
         providers: [
-
-
           {
             resolve: "@medusajs/medusa/payment-stripe",
             id: "stripe",
             options: {
               apiKey: process.env.STRIPE_API_KEY,
-              capture: true,
-              webhookSecret:process.env.STRIPE_WEBHOOK_SECRET,
+              webhookSecret: process.env.STRIPE_WEBHOOK_SECRET,
             },
           },
-
-
         ],
       },
     },
-
-
-
-/////////Alvara tax
-
-
-///////////////////////SENDGRID 
-  {
+    /////////Alvara tax
+    ///////////////////////SENDGRID
+    {
       resolve: "@medusajs/medusa/notification",
       options: {
         providers: [
@@ -77,16 +56,10 @@ modules: [
         ],
       },
     },
-
-
   ],
-
-
-
-
   projectConfig: {
-/// databaseUrl: process.env.DATABASE_URL,
- // redisUrl: process.env.REDIS_URL,
+    /// databaseUrl: process.env.DATABASE_URL,
+    // redisUrl: process.env.REDIS_URL,
     http: {
       storeCors: process.env.STORE_CORS!,
       adminCors: process.env.ADMIN_CORS!,
