@@ -1,13 +1,11 @@
+// src/components/CreateBundleModal.tsx
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { X } from "lucide-react";
 import { HttpTypes } from "@medusajs/types";
 import { sdk } from "@lib/config";
-import { getPricesForVariant } from "@lib/util/get-product-price";
-import { saveBundleAction } from "app/actions/bundleActions";
-
-/* ---------------- TYPES ---------------- */
+import { saveBundleAction, updateBundleAction } from "app/actions/bundleActions";
 
 type BundleItem = {
   product_id: string;
@@ -15,31 +13,49 @@ type BundleItem = {
   quantity: number;
 };
 
+type Bundle = {
+  id: string;
+  name: string;
+  items: BundleItem[];
+};
+
 type Props = {
   isOpen: boolean;
   onClose: () => void;
+  bundle?: Bundle | null;
 };
 
-/* ---------------- COMPONENT ---------------- */
-
-export default function CreateBundleModal({ isOpen, onClose }: Props) {
-  /* ---------- STATE ---------- */
+export default function CreateBundleModal({
+  isOpen,
+  onClose,
+  bundle,
+}: Props) {
   const [products, setProducts] = useState<HttpTypes.StoreProduct[]>([]);
   const [selected, setSelected] = useState<BundleItem[]>([]);
   const [bundleName, setBundleName] = useState("");
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
 
-  /* ---------- LOAD PRODUCTS ---------- */
+  /* ---------- PREFILL ---------- */
   useEffect(() => {
-    if (!isOpen) {
-      setSelected([]);
+    if (!isOpen) return;
+
+    if (bundle) {
+      setBundleName(bundle.name);
+      setSelected(bundle.items);
+    } else {
       setBundleName("");
-      setSearchQuery("");
-      return;
+      setSelected([]);
     }
 
-    const fetchProducts = async () => {
+    setSearchQuery("");
+  }, [bundle, isOpen]);
+
+  /* ---------- LOAD PRODUCTS ---------- */
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const loadProducts = async () => {
       try {
         const { products } = await sdk.store.product.list({
           limit: 200,
@@ -53,35 +69,38 @@ export default function CreateBundleModal({ isOpen, onClose }: Props) {
               Array.isArray(p.variants) && p.variants.length > 0
           )
         );
-      } catch (err) {
-        console.error("Failed to load products", err);
-        alert("Failed to load products. Please refresh.");
+      } catch (error) {
+        console.error(error);
+        alert("Failed to load products.");
       }
     };
 
-    fetchProducts();
+    loadProducts();
   }, [isOpen]);
 
-  /* ---------- SEARCH (MEMOIZED) ---------- */
+  /* ---------- SEARCH ---------- */
   const filteredProducts = useMemo(() => {
     if (!searchQuery.trim()) return products;
-
     const q = searchQuery.toLowerCase();
 
-    return products.filter((product) => {
-      return (
-        product.title.toLowerCase().includes(q) ||
-        product.variants?.some((v) =>
+    return products.filter(
+      (p) =>
+        p.title.toLowerCase().includes(q) ||
+        p.variants?.some((v) =>
           v.title?.toLowerCase().includes(q)
         )
-      );
-    });
+    );
   }, [products, searchQuery]);
 
-  /* ---------- ADD / INCREMENT ---------- */
-  const toggleItem = (product: HttpTypes.StoreProduct, variantId: string) => {
+  /* ---------- ADD / UPDATE ---------- */
+  const toggleItem = (
+    product: HttpTypes.StoreProduct,
+    variantId: string
+  ) => {
     setSelected((prev) => {
-      const existing = prev.find((i) => i.variant_id === variantId);
+      const existing = prev.find(
+        (i) => i.variant_id === variantId
+      );
 
       if (existing) {
         return prev.map((i) =>
@@ -102,7 +121,6 @@ export default function CreateBundleModal({ isOpen, onClose }: Props) {
     });
   };
 
-  /* ---------- UPDATE QTY ---------- */
   const updateQty = (variantId: string, delta: number) => {
     setSelected((prev) =>
       prev
@@ -115,27 +133,64 @@ export default function CreateBundleModal({ isOpen, onClose }: Props) {
     );
   };
 
-  /* ---------- SAVE BUNDLE ---------- */
+  /* ---------- MONEY ---------- */
+  const formatMoney = (amount: number, currency = "USD") =>
+    new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency,
+    }).format(amount);
+
+  /* ---------- TOTAL ---------- */
+  const bundleTotal = useMemo(() => {
+    return selected.reduce((total, item) => {
+      const product = products.find(
+        (p) => p.id === item.product_id
+      );
+      const variant = product?.variants?.find(
+        (v) => v.id === item.variant_id
+      );
+
+      const amount =
+        variant?.calculated_price?.calculated_amount ?? 0;
+
+      return total + amount * item.quantity;
+    }, 0);
+  }, [selected, products]);
+
+  const currencyCode =
+    products[0]?.variants?.[0]?.calculated_price?.currency_code?.toUpperCase() ||
+    "USD";
+
+  /* ---------- SAVE ---------- */
   const handleSave = async () => {
     if (!bundleName.trim()) {
       alert("Please enter a bundle name");
       return;
     }
 
-    if (selected.length === 0) {
+    if (!selected.length) {
       alert("Add at least one product");
       return;
     }
 
     setLoading(true);
-    const result = await saveBundleAction(bundleName.trim(), selected);
-    setLoading(false);
 
-    if (result.success) {
-      alert("Bundle saved successfully");
-      onClose();
-    } else {
-      alert(result.error || "Failed to save bundle");
+    try {
+      const result = bundle
+        ? await updateBundleAction(
+            bundle.id,
+            bundleName.trim(),
+            selected
+          )
+        : await saveBundleAction(
+            bundleName.trim(),
+            selected
+          );
+
+      if (result.success) onClose();
+      else alert(result.error || "Failed to save bundle");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -143,105 +198,90 @@ export default function CreateBundleModal({ isOpen, onClose }: Props) {
 
   /* ---------- RENDER ---------- */
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-3">
-      <div className="w-full max-w-7xl max-h-[92vh] overflow-hidden rounded-3xl bg-white shadow-2xl">
-        {/* Header */}
-        <div className="flex items-center justify-between border-b bg-gray-50 px-6 py-4">
-          <h2 className="text-2xl font-bold">Create Bundle</h2>
+    <div className="fixed inset-0 z-50 bg-black/60 flex items-end sm:items-center justify-center">
+      <div className="w-full h-[95vh] sm:h-auto sm:max-w-7xl bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl flex flex-col overflow-hidden">
+        {/* HEADER */}
+        <div className="flex items-center justify-between px-4 sm:px-6 py-4 border-b">
+          <h2 className="text-lg sm:text-2xl font-bold">
+            {bundle ? "Edit Bundle" : "Create Bundle"}
+          </h2>
           <button
             onClick={onClose}
-            className="rounded-full p-2 hover:bg-gray-200"
+            className="p-2 rounded-full hover:bg-gray-100"
           >
-            <X className="h-6 w-6" />
+            <X />
           </button>
         </div>
 
-        <div className="flex h-full max-h-[calc(92vh-72px)] flex-col md:flex-row">
-          {/* PRODUCT GRID */}
-          <div className="flex-1 overflow-y-auto p-6">
-            <h3 className="mb-5 text-lg font-semibold">
-              Choose Products ({filteredProducts.length})
-            </h3>
+        <div className="flex flex-col sm:flex-row flex-1 overflow-hidden">
+          {/* PRODUCTS */}
+          <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-4">
+            <input
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search products..."
+              className="w-full mb-4 rounded-xl border px-4 py-3 text-base"
+            />
 
-            {/* SEARCH */}
-            <div className="mb-5">
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search products by name or variant…"
-                className="w-full rounded-xl border px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-black"
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
               {filteredProducts.map((product) => {
                 const variant = product.variants![0];
-                const price = getPricesForVariant(variant);
+                const amount =
+                  variant.calculated_price?.calculated_amount ?? 0;
+
                 const isAdded = selected.some(
                   (i) => i.variant_id === variant.id
                 );
 
                 return (
-                  <div
+                  <button
                     key={product.id}
-                    onClick={() => toggleItem(product, variant.id)}
-                    className={`cursor-pointer rounded-xl border-2 p-3 text-center transition ${
+                    onClick={() =>
+                      toggleItem(product, variant.id)
+                    }
+                    className={`rounded-2xl border-2 p-3 text-left transition ${
                       isAdded
                         ? "border-black"
                         : "border-gray-200 hover:border-gray-400"
                     }`}
                   >
-                    {/* SQUARE IMAGE */}
-                    <div className="mb-3 aspect-square w-full overflow-hidden rounded-lg bg-gray-100">
-                      {product.thumbnail ? (
+                    <div className="mb-2 aspect-square bg-gray-100 rounded-xl overflow-hidden">
+                      {product.thumbnail && (
                         <img
                           src={product.thumbnail}
                           alt={product.title}
-                          className="h-full w-full object-cover"
+                          className="w-full h-full object-cover"
                         />
-                      ) : (
-                        <div className="h-full w-full bg-gray-200" />
                       )}
                     </div>
 
-                    <p className="line-clamp-2 text-sm font-medium">
+                    <p className="text-sm font-medium line-clamp-2">
                       {product.title}
                     </p>
 
-                    {price && (
-                      <p className="mt-1 text-base font-bold">
-                        {price.calculated_price}
-                      </p>
-                    )}
+                    <p className="mt-1 text-sm font-bold">
+                      {formatMoney(amount, currencyCode)}
+                    </p>
 
-                    <span
-                      className={`mt-3 inline-block rounded-full px-4 py-1 text-xs font-bold ${
-                        isAdded
-                          ? "bg-black text-white"
-                          : "bg-gray-200 text-gray-700"
-                      }`}
-                    >
+                    <span className="mt-2 inline-block text-xs font-semibold">
                       {isAdded ? "Added" : "+ Add"}
                     </span>
-                  </div>
+                  </button>
                 );
               })}
             </div>
           </div>
 
           {/* PREVIEW */}
-          <div className="w-full border-t bg-gray-50 p-6 md:w-96 md:border-l md:border-t-0">
-            <h3 className="mb-4 text-lg font-semibold">Bundle Preview</h3>
-
+          <div className="border-t sm:border-t-0 sm:border-l bg-gray-50 px-4 sm:px-6 py-4 w-full sm:w-96 overflow-y-auto">
             <input
               value={bundleName}
               onChange={(e) => setBundleName(e.target.value)}
-              placeholder="e.g. Monthly Cleaning Kit"
-              className="w-full rounded-xl border px-4 py-3 text-base"
+              placeholder="Bundle name"
+              className="w-full mb-4 rounded-xl border px-4 py-3 text-base"
             />
 
-            <div className="mt-6 space-y-3">
+            <div className="space-y-3 max-h-64 sm:max-h-none overflow-y-auto">
               {selected.map((item) => {
                 const product = products.find(
                   (p) => p.id === item.product_id
@@ -250,25 +290,31 @@ export default function CreateBundleModal({ isOpen, onClose }: Props) {
                 return (
                   <div
                     key={item.variant_id}
-                    className="flex items-center justify-between rounded-xl bg-white p-4 shadow"
+                    className="flex items-center justify-between bg-white p-3 rounded-xl shadow-sm"
                   >
                     <span className="text-sm font-medium">
                       {product?.title}
                     </span>
 
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-2">
                       <button
-                        onClick={() => updateQty(item.variant_id, -1)}
-                        className="h-8 w-8 rounded-lg bg-gray-200"
+                        onClick={() =>
+                          updateQty(item.variant_id, -1)
+                        }
+                        className="w-9 h-9 rounded-lg bg-gray-200 text-lg"
                       >
                         −
                       </button>
-                      <span className="w-8 text-center">
+
+                      <span className="min-w-[20px] text-center">
                         {item.quantity}
                       </span>
+
                       <button
-                        onClick={() => updateQty(item.variant_id, 1)}
-                        className="h-8 w-8 rounded-lg bg-gray-200"
+                        onClick={() =>
+                          updateQty(item.variant_id, 1)
+                        }
+                        className="w-9 h-9 rounded-lg bg-gray-200 text-lg"
                       >
                         +
                       </button>
@@ -278,10 +324,19 @@ export default function CreateBundleModal({ isOpen, onClose }: Props) {
               })}
             </div>
 
+            <div className="mt-4 pt-4 border-t flex justify-between font-bold">
+              <span>Total</span>
+              <span>
+                {formatMoney(bundleTotal, currencyCode)}
+              </span>
+            </div>
+
             <button
               onClick={handleSave}
-              disabled={loading || !bundleName.trim() || selected.length === 0}
-              className="mt-6 w-full rounded-xl bg-black py-4 text-lg font-bold text-white disabled:opacity-50"
+              disabled={
+                loading || !bundleName || !selected.length
+              }
+              className="mt-4 w-full rounded-xl bg-black py-4 text-white font-bold disabled:opacity-50"
             >
               {loading ? "Saving..." : "Save Bundle"}
             </button>

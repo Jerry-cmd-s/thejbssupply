@@ -1,51 +1,71 @@
-import { Text } from "@medusajs/ui"
-import { listProducts } from "@lib/data/products"
-import { getProductPrice } from "@lib/util/get-product-price"
-import { HttpTypes } from "@medusajs/types"
-import LocalizedClientLink from "@modules/common/components/localized-client-link"
-import Thumbnail from "../thumbnail"
-import PreviewPrice from "./price"
+"use client";
 
-export default async function ProductPreview({
+import { Text, Button } from "@medusajs/ui";
+import { HttpTypes } from "@medusajs/types";
+import { useState } from "react";
+import LocalizedClientLink from "@modules/common/components/localized-client-link";
+import { getProductPrice } from "@lib/util/get-product-price";
+import Thumbnail from "../thumbnail";
+import PreviewPrice from "./price";
+import { addToCartAction } from 'app/actions/cartActions'; // Add this import
+
+export default function ProductPreview({
   product,
   isFeatured,
   region,
 }: {
-  product: HttpTypes.StoreProduct
-  isFeatured?: boolean
-  region: HttpTypes.StoreRegion
+  product: HttpTypes.StoreProduct;
+  isFeatured?: boolean;
+  region: HttpTypes.StoreRegion;
 }) {
-  // const pricedProduct = await listProducts({
-  //   regionId: region.id,
-  //   queryParams: { id: [product.id!] },
-  // }).then(({ response }) => response.products[0])
+  const [loading, setLoading] = useState(false);
+  const { cheapestPrice } = getProductPrice({ product });
+  const defaultVariant = product.variants?.[0];
 
-  // if (!pricedProduct) {
-  //   return null
-  // }
+  const handleAddToCart = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!defaultVariant) return;
 
-  const { cheapestPrice } = getProductPrice({
-    product,
-  })
+    setLoading(true);
+    const result = await addToCartAction(defaultVariant.id, 1);
+    setLoading(false);
+
+    if (result.success) {
+      alert("Product added to cart!");
+    } else {
+      alert(result.error || "Failed to add to cart");
+    }
+  };
 
   return (
-    <LocalizedClientLink href={`/products/${product.handle}`} className="group">
-      <div data-testid="product-wrapper">
-        <Thumbnail
-          thumbnail={product.thumbnail}
-          images={product.images}
-          size="full"
-          isFeatured={isFeatured}
-        />
-        <div className="flex txt-compact-medium mt-4 justify-between">
-          <Text className="text-ui-fg-subtle" data-testid="product-title">
-            {product.title}
-          </Text>
-          <div className="flex items-center gap-x-2">
+    <div className="group">
+      {/* Product navigation */}
+      <LocalizedClientLink href={`/products/${product.handle}`}>
+        <div data-testid="product-wrapper">
+          <Thumbnail
+            thumbnail={product.thumbnail}
+            images={product.images}
+            size="full"
+            isFeatured={isFeatured}
+          />
+          <div className="flex txt-compact-medium mt-4 justify-between items-start">
+            <Text className="text-ui-fg-subtle">
+              {product.title}
+            </Text>
             {cheapestPrice && <PreviewPrice price={cheapestPrice} />}
           </div>
         </div>
-      </div>
-    </LocalizedClientLink>
-  )
+      </LocalizedClientLink>
+      {/* Add to Cart */}
+      <Button
+        size="small"
+        className="mt-3 w-full"
+        onClick={handleAddToCart}
+        disabled={loading || !defaultVariant}
+      >
+        {loading ? "Adding…" : "Add to Cart"}
+      </Button>
+    </div>
+  );
 }

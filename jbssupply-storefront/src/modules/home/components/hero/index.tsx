@@ -1,5 +1,5 @@
 "use client"
-
+import Image from "next/image"
 import { Button, Heading } from "@medusajs/ui"
 import { motion, AnimatePresence } from "framer-motion"
 import { useState, useEffect } from "react"
@@ -17,7 +17,7 @@ const buttonVariants = {
 const Hero = () => {
   const [wordIndex, setWordIndex] = useState(0)
   const [showNextDay, setShowNextDay] = useState(false)
-  const words = ["Restaurants", "Salon & Spas", "Cafes", "Bars", "Office"]
+  const words = ["Restaurants", "Food Trucks", "Cafes", "Bars", "Offices"]
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -29,6 +29,11 @@ const Hero = () => {
 
   return (
     <div className="relative h-screen md:h-[80vh] w-full overflow-hidden border-b border-ui-border-base bg-gradient-to-br from-black-900 to-red-600">
+
+
+
+
+      
       <div className="absolute inset-0 z-10 flex flex-col justify-center items-center text-center px-6 sm:px-8 md:px-12">
 
         {/* Main heading */}
@@ -107,7 +112,9 @@ const Hero = () => {
           </motion.p>
         </AnimatePresence>
       </div>
+   
     </div>
+    
   )
 }
 
@@ -131,7 +138,7 @@ const MainContent = () => {
     },
     {
       title: "Reliability",
-      desc: "You show up on time and your products do what they’re supposed to do.",
+      desc: "We show up on time and your products do what they’re supposed to do.", 
       icon: ShieldCheck,
     },
   ]
@@ -142,6 +149,15 @@ const MainContent = () => {
       {/* Why Choose Us */}
       <section className="content-container text-center mb-16 sm:mb-20">
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8 }}>
+          <div className="flex justify-center">
+  <Image
+    src="/flvan.png"
+    alt="JB'S Supply South Florida delivery network map"
+    width={450}
+    height={185}
+  />
+</div>
+
           <Heading level="h2" className="text-2xl sm:text-3xl font-bold mb-4 sm:mb-6 text-black-900 font-calibri">
             Why Choose JB’s Supply?
           </Heading>
