@@ -31,7 +31,7 @@ module.exports = defineConfig({
       options: {
         providers: [
           {
-            resolve: "./src/modules/email-notifications",
+            resolve: "./src/modules/resend",
             id: "resend",
             options: {
               channels: ["email"],
