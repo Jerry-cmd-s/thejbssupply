@@ -31,7 +31,7 @@ module.exports = defineConfig({
       options: {
         providers: [
           {
-            resolve: "./src/modules/resend",
+            resolve: "./src/modules/email-notifications",
             id: "resend",
             options: {
               channels: ["email"],
@@ -47,25 +47,8 @@ module.exports = defineConfig({
 
 
 
-    /////////Alvara tax
-    ///////////////////////SENDGRID
-    {
-      resolve: "@medusajs/medusa/notification",
-      options: {
-        providers: [
-          // ...
-          {
-            resolve: "@medusajs/medusa/notification-sendgrid",
-            id: "sendgrid",
-            options: {
-              channels: ["email"],
-              api_key: process.env.SENDGRID_API_KEY,
-              from: process.env.SENDGRID_FROM,
-            },
-          },
-        ],
-      },
-    },
+
+
   ],
   projectConfig: {
     /// databaseUrl: process.env.DATABASE_URL,

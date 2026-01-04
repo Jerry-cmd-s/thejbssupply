@@ -80,7 +80,7 @@ const Hero = () => {
           <motion.div variants={buttonVariants} initial="hidden" animate="visible" whileHover="hover">
           
 
-<Link href="/account">
+<Link href="/account/">
   <Button
     variant="secondary"
     size="large"
