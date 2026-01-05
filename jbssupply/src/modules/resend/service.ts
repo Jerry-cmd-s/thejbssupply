@@ -1,5 +1,5 @@
 // src/modules/resend/service.ts
-
+import { userInvitedEmail } from "./emails/user-invited"
 import {
   AbstractNotificationProviderService,
   MedusaError,
@@ -39,6 +39,7 @@ const templates: { [key in Templates]?: (props: unknown) => React.ReactNode } = 
   // Example from the Resend guide:
   // [Templates.ORDER_PLACED]: orderPlacedEmail,
   // Other templates (user-invited, password-reset) are added similarly
+  [Templates.USER_INVITED]: userInvitedEmail,
 }
 
 class ResendNotificationProviderService extends AbstractNotificationProviderService {
