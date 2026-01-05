@@ -29,9 +29,9 @@ type InjectedDependencies = {
 }
 
 enum Templates {
-  ORDER_PLACED = "order-placed",
+ // ORDER_PLACED = "order-placed",
   // You can add more templates here, e.g.:
-  // USER_INVITED = "user-invited",
+   USER_INVITED = "user-invited",
   // PASSWORD_RESET = "password-reset",
 }
 
@@ -97,8 +97,8 @@ class ResendNotificationProviderService extends AbstractNotificationProviderServ
       case Templates.ORDER_PLACED:
         return "Order Confirmation"
       // Example extensions from other docs:
-      // case Templates.USER_INVITED:
-      //   return "You've been invited to join our platform"
+       case Templates.USER_INVITED:
+         return "You've been invited to join our platform"
       // case Templates.PASSWORD_RESET:
       //   return "Reset Your Password"
       default:
