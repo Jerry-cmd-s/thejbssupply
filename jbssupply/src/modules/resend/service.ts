@@ -94,11 +94,11 @@ class ResendNotificationProviderService extends AbstractNotificationProviderServ
     }
 
     switch (template) {
-      case Templates.ORDER_PLACED:
-        return "Order Confirmation"
+     // case Templates.ORDER_PLACED:
+       // return "Order Confirmation"
       // Example extensions from other docs:
        case Templates.USER_INVITED:
-         return "You've been invited to join our platform"
+         return "You've been invited to become Team Member at Jb's Supply"
       // case Templates.PASSWORD_RESET:
       //   return "Reset Your Password"
       default:
