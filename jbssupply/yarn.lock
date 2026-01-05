@@ -4186,7 +4186,7 @@
   resolved "https://registry.npmjs.org/@react-email/column/-/column-0.0.14.tgz"
   integrity sha512-f+W+Bk2AjNO77zynE33rHuQhyqVICx4RYtGX9NKsGUg0wWjdGP0qAuIkhx9Rnmk4/hFMo1fUrtYNqca9fwJdHg==
 
-"@react-email/components@1.0.3":
+"@react-email/components@^1.0.3":
   version "1.0.3"
   resolved "https://registry.npmjs.org/@react-email/components/-/components-1.0.3.tgz"
   integrity sha512-RbleOT35XSCWM54Rs76/BgfPA0Son55OH4awBYlkHZgLw0AdbPwobhE7izNDFqY4nHW7+omLfe3CByWbsg/hEw==
@@ -4264,7 +4264,7 @@
   resolved "https://registry.npmjs.org/@react-email/preview/-/preview-0.0.14.tgz"
   integrity sha512-aYK8q0IPkBXyMsbpMXgxazwHxYJxTrXrV95GFuu2HbEiIToMwSyUgb8HDFYwPqqfV03/jbwqlsXmFxsOd+VNaw==
 
-"@react-email/render@2.0.1":
+"@react-email/render@*", "@react-email/render@^2.0.1", "@react-email/render@2.0.1":
   version "2.0.1"
   resolved "https://registry.npmjs.org/@react-email/render/-/render-2.0.1.tgz"
   integrity sha512-eYNL4+SSrV1+58MIcT4znarX4YTMuYBr1uzhI6U8fBFvRMZPryxNOnD7jnZ/Ser3MtJEquQNbXjrAP+RVkfLbg==
