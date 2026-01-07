@@ -11,6 +11,7 @@ import {
 } from "@medusajs/framework/types"
 import { Resend } from "resend"
 import { CreateEmailOptions } from "resend"
+import { PasswordResetEmailComponent } from "./emails/password-reset"
 
 type ResendOptions = {
   api_key: string
@@ -31,6 +32,7 @@ type InjectedDependencies = {
 enum Templates {
  // ORDER_PLACED = "order-placed",
   // You can add more templates here, e.g.:
+  PASSWORD_RESET = "password-reset",
    USER_INVITED = "user-invited",
   // PASSWORD_RESET = "password-reset",
 }
@@ -40,6 +42,7 @@ const templates: { [key in Templates]?: (props: unknown) => React.ReactNode } = 
   // [Templates.ORDER_PLACED]: orderPlacedEmail,
   // Other templates (user-invited, password-reset) are added similarly
   [Templates.USER_INVITED]: userInvitedEmail,
+  [Templates.PASSWORD_RESET]: PasswordResetEmailComponent,
 }
 
 class ResendNotificationProviderService extends AbstractNotificationProviderService {
@@ -100,6 +103,9 @@ class ResendNotificationProviderService extends AbstractNotificationProviderServ
       // Example extensions from other docs:
        case Templates.USER_INVITED:
          return "You've been invited to become Team Member at Jb's Supply"
+         
+         case Templates.PASSWORD_RESET:
+      return "Reset your JBSSupply password"
       // case Templates.PASSWORD_RESET:
       //   return "Reset Your Password"
       default:
