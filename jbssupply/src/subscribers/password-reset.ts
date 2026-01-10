@@ -5,36 +5,31 @@ import {
 import { Modules } from "@medusajs/framework/utils"
 
 export default async function resetPasswordTokenHandler({
-  event: { data: {
-    entity_id: email,
-    token,
-    actor_type,
-  } },
+  event: { data: { entity_id: email, token, actor_type } },
   container,
 }: SubscriberArgs<{ entity_id: string, token: string, actor_type: string }>) {
-  const notificationModuleService = container.resolve(
-    Modules.NOTIFICATION
-  )
+  const notificationModuleService = container.resolve(Modules.NOTIFICATION)
   const config = container.resolve("configModule")
 
   let urlPrefix = ""
 
   if (actor_type === "customer") {
+    // Frontend URL for the customer
     urlPrefix = config.admin.storefrontUrl || "https://thejbssupply.com"
   } else {
+    // Admin URL (if needed)
     const backendUrl = config.admin.backendUrl !== "/" ? config.admin.backendUrl :
       "https://jbssupply.medusajs.app"
     const adminPath = config.admin.path
     urlPrefix = `${backendUrl}${adminPath}`
   }
 
+  // Send the notification with the correct reset URL
   await notificationModuleService.createNotifications({
     to: email,
     channel: "email",
-    // TODO replace with template ID in notification provider
     template: "password-reset",
     data: {
-      // a URL to a frontend application
       reset_url: `${urlPrefix}/reset-password?token=${token}&email=${email}`,
     },
   })
