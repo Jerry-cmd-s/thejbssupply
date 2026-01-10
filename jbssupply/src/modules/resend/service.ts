@@ -11,7 +11,9 @@ import {
 } from "@medusajs/framework/types"
 import { Resend } from "resend"
 import { CreateEmailOptions } from "resend"
-import { PasswordResetEmailComponent } from "./emails/password-reset"
+//import { passwordResetEmail } from "src/modules/resend/emails/password-reset"
+import { passwordResetEmail } from "./emails/password-reset"
+import React from "react"
 
 type ResendOptions = {
   api_key: string
@@ -42,7 +44,7 @@ const templates: { [key in Templates]?: (props: unknown) => React.ReactNode } = 
   // [Templates.ORDER_PLACED]: orderPlacedEmail,
   // Other templates (user-invited, password-reset) are added similarly
   [Templates.USER_INVITED]: userInvitedEmail,
-  [Templates.PASSWORD_RESET]: PasswordResetEmailComponent,
+  [Templates.PASSWORD_RESET]: passwordResetEmail,
 }
 
 class ResendNotificationProviderService extends AbstractNotificationProviderService {
