@@ -18,22 +18,33 @@ import {
   Trash2,
 } from "lucide-react";
 
-/* ---------- TYPES ---------- */
+/* =====================
+   Types
+===================== */
 
 type BundleItem = {
-  quantity: number;
   variant_id: string;
+  quantity: number;
+};
+
+type DeliverySchedule = {
+  interval_type: "months";
+  interval_count: number;
+  day_of_month: number;
+  start_date: string;
 };
 
 type Bundle = {
   id: string;
   name: string;
   created_at: string;
-  delivery_day: number; // 1–28 (monthly delivery day)
   items: BundleItem[];
+  delivery_schedule: DeliverySchedule;
 };
 
-/* ---------- HELPERS ---------- */
+/* =====================
+   Helpers
+===================== */
 
 const formatMoney = (amount: number) =>
   new Intl.NumberFormat("en-US", {
@@ -41,22 +52,40 @@ const formatMoney = (amount: number) =>
     currency: "USD",
   }).format(amount);
 
-const getNextDeliveryDate = (deliveryDay: number) => {
+/**
+ * Calculate next delivery date based on:
+ * - every X months
+ * - day of month (1–28)
+ * - start date
+ */
+const getNextDeliveryDate = (
+  schedule: DeliverySchedule
+): Date | null => {
+  if (!schedule) return null;
+
+  const { interval_count, day_of_month, start_date } = schedule;
+
+  const start = new Date(start_date);
+  if (isNaN(start.getTime())) return null;
+
   const today = new Date();
-  const year = today.getFullYear();
-  const month = today.getMonth();
+  let current = new Date(start);
 
-  const candidate = new Date(year, month, deliveryDay);
+  // Normalize day
+  current.setDate(
+    Math.min(day_of_month, 28)
+  );
 
-  // If delivery day already passed this month → next month
-  if (candidate < today) {
-    return new Date(year, month + 1, deliveryDay);
+  while (current < today) {
+    current.setMonth(current.getMonth() + interval_count);
   }
 
-  return candidate;
+  return isNaN(current.getTime()) ? null : current;
 };
 
-/* ---------- COMPONENT ---------- */
+/* =====================
+   Component
+===================== */
 
 export default function MyBundlesPage() {
   const [bundles, setBundles] = useState<Bundle[]>([]);
@@ -64,10 +93,12 @@ export default function MyBundlesPage() {
   const [loading, setLoading] = useState(true);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editBundle, setEditBundle] = useState<Bundle | null>(null);
-  const [busyId, setBusyId] = useState<string | null>(null);
+  const [editingBundle, setEditingBundle] = useState<Bundle | null>(null);
+  const [busyBundleId, setBusyBundleId] = useState<string | null>(null);
 
-  /* ---------- LOAD ---------- */
+  /* =====================
+     Load Bundles
+  ===================== */
 
   useEffect(() => {
     loadBundles();
@@ -76,20 +107,23 @@ export default function MyBundlesPage() {
   const loadBundles = async () => {
     setLoading(true);
     try {
-      const result = await getSavedBundlesAction();
-      if (!result.success || !Array.isArray(result.bundles)) {
+      const res = await getSavedBundlesAction();
+
+      if (!res.success || !Array.isArray(res.bundles)) {
         setBundles([]);
         return;
       }
 
-      setBundles(result.bundles);
-      calculateTotals(result.bundles);
+      setBundles(res.bundles);
+      calculateTotals(res.bundles);
     } finally {
       setLoading(false);
     }
   };
 
-  /* ---------- TOTALS ---------- */
+  /* =====================
+     Calculate Totals
+  ===================== */
 
   const calculateTotals = async (bundles: Bundle[]) => {
     try {
@@ -100,7 +134,7 @@ export default function MyBundlesPage() {
 
       const totals: Record<string, number> = {};
 
-      bundles.forEach((bundle) => {
+      for (const bundle of bundles) {
         totals[bundle.id] = bundle.items.reduce((sum, item) => {
           const product = products.find((p) =>
             p.variants?.some((v) => v.id === item.variant_id)
@@ -115,38 +149,43 @@ export default function MyBundlesPage() {
 
           return sum + price * item.quantity;
         }, 0);
-      });
+      }
 
       setBundleTotals(totals);
     } catch {
-      // intentionally silent — totals are non-critical UI
+      // non-critical UI
     }
   };
 
-  /* ---------- ACTIONS ---------- */
+  /* =====================
+     Actions
+  ===================== */
 
-  const addToCart = async (bundle: Bundle) => {
-    setBusyId(bundle.id);
+  const handleAddToCart = async (bundle: Bundle) => {
+    setBusyBundleId(bundle.id);
     try {
       const res = await addBundleToCartAction(bundle.items);
       if (res.success) window.location.href = "/cart";
     } finally {
-      setBusyId(null);
+      setBusyBundleId(null);
     }
   };
 
-  const deleteBundle = async (id: string) => {
+  const handleDeleteBundle = async (bundleId: string) => {
     if (!confirm("Delete this bundle?")) return;
-    setBusyId(id);
+
+    setBusyBundleId(bundleId);
     try {
-      await deleteBundleAction(id);
+      await deleteBundleAction(bundleId);
       await loadBundles();
     } finally {
-      setBusyId(null);
+      setBusyBundleId(null);
     }
   };
 
-  /* ---------- UI ---------- */
+  /* =====================
+     UI
+  ===================== */
 
   return (
     <div className="min-h-screen bg-gray-50 px-4 py-10">
@@ -158,16 +197,16 @@ export default function MyBundlesPage() {
               My Bundles
             </h1>
             <p className="text-sm text-gray-500">
-              Monthly bundles with scheduled delivery
+              Automated monthly bundle deliveries
             </p>
           </div>
 
           <button
             onClick={() => {
-              setEditBundle(null);
+              setEditingBundle(null);
               setIsModalOpen(true);
             }}
-            className="inline-flex items-center gap-2 rounded-lg bg-black px-5 py-2.5 text-base font-medium text-white hover:bg-gray-800"
+            className="inline-flex items-center gap-2 rounded-lg bg-black px-5 py-2.5 text-white hover:bg-gray-800"
           >
             <Plus size={18} />
             New Bundle
@@ -177,7 +216,7 @@ export default function MyBundlesPage() {
         {/* Loading */}
         {loading && (
           <div className="space-y-4">
-            {[...Array(3)].map((_, i) => (
+            {Array.from({ length: 3 }).map((_, i) => (
               <div
                 key={i}
                 className="h-32 animate-pulse rounded-xl bg-white"
@@ -186,24 +225,11 @@ export default function MyBundlesPage() {
           </div>
         )}
 
-        {/* Empty */}
-        {!loading && bundles.length === 0 && (
-          <div className="rounded-xl bg-white p-16 text-center">
-            <Package className="mx-auto mb-4 text-gray-300" size={52} />
-            <p className="font-medium text-gray-700">
-              No bundles created yet
-            </p>
-            <p className="text-sm text-gray-500">
-              Create one to automate monthly ordering
-            </p>
-          </div>
-        )}
-
         {/* Bundles */}
         {!loading &&
           bundles.map((bundle) => {
             const nextDelivery = getNextDeliveryDate(
-              bundle.delivery_day
+              bundle.delivery_schedule
             );
 
             return (
@@ -211,18 +237,20 @@ export default function MyBundlesPage() {
                 key={bundle.id}
                 className="rounded-xl bg-white p-6 shadow-sm"
               >
-                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex flex-col gap-4 sm:flex-row sm:justify-between">
                   {/* Info */}
                   <div className="space-y-1">
-                    <h3 className="text-lg font-semibold text-gray-900">
+                    <h3 className="text-lg font-semibold">
                       {bundle.name}
                     </h3>
 
-                    <div className="flex flex-wrap items-center gap-4 text-sm text-gray-500">
+                    <div className="flex flex-wrap gap-4 text-sm text-gray-500">
                       <span className="flex items-center gap-1">
                         <Calendar size={16} />
-                        Next delivery:{" "}
-                        {nextDelivery.toLocaleDateString()}
+                        Next delivery:&nbsp;
+                        {nextDelivery
+                          ? nextDelivery.toLocaleDateString()
+                          : "Not scheduled"}
                       </span>
 
                       <span className="flex items-center gap-1">
@@ -231,7 +259,11 @@ export default function MyBundlesPage() {
                       </span>
 
                       <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-medium text-blue-700">
-                        Monthly • Day {bundle.delivery_day}
+                        Every {bundle.delivery_schedule.interval_count} month
+                        {bundle.delivery_schedule.interval_count > 1
+                          ? "s"
+                          : ""}{" "}
+                        • Day {bundle.delivery_schedule.day_of_month}
                       </span>
 
                       {bundleTotals[bundle.id] !== undefined && (
@@ -245,11 +277,11 @@ export default function MyBundlesPage() {
                   {/* Actions */}
                   <div className="flex gap-2">
                     <button
-                      onClick={() => addToCart(bundle)}
-                      disabled={busyId === bundle.id}
-                      className="inline-flex items-center gap-1.5 rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+                      onClick={() => handleAddToCart(bundle)}
+                      disabled={busyBundleId === bundle.id}
+                      className="inline-flex items-center gap-1.5 rounded-md bg-blue-600 px-4 py-2 text-sm text-white disabled:opacity-50"
                     >
-                      {busyId === bundle.id ? (
+                      {busyBundleId === bundle.id ? (
                         <Loader2 size={16} className="animate-spin" />
                       ) : (
                         <ShoppingCart size={16} />
@@ -259,19 +291,19 @@ export default function MyBundlesPage() {
 
                     <button
                       onClick={() => {
-                        setEditBundle(bundle);
+                        setEditingBundle(bundle);
                         setIsModalOpen(true);
                       }}
-                      className="inline-flex items-center gap-1.5 rounded-md bg-gray-100 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-200"
+                      className="inline-flex items-center gap-1.5 rounded-md bg-gray-100 px-4 py-2 text-sm"
                     >
                       <Pencil size={16} />
                       Edit
                     </button>
 
                     <button
-                      onClick={() => deleteBundle(bundle.id)}
-                      disabled={busyId === bundle.id}
-                      className="inline-flex items-center gap-1.5 rounded-md bg-red-50 px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-100 disabled:opacity-50"
+                      onClick={() => handleDeleteBundle(bundle.id)}
+                      disabled={busyBundleId === bundle.id}
+                      className="inline-flex items-center gap-1.5 rounded-md bg-red-50 px-4 py-2 text-sm text-red-600 disabled:opacity-50"
                     >
                       <Trash2 size={16} />
                     </button>
@@ -281,13 +313,12 @@ export default function MyBundlesPage() {
             );
           })}
 
-        {/* Modal */}
         <CreateBundleModal
           isOpen={isModalOpen}
-          bundle={editBundle}
+          bundle={editingBundle}
           onClose={() => {
             setIsModalOpen(false);
-            setEditBundle(null);
+            setEditingBundle(null);
             loadBundles();
           }}
         />
