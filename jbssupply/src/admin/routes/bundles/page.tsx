@@ -1,5 +1,3 @@
-"use client"
-
 import {
   Container,
   DataTable,
@@ -22,7 +20,7 @@ type AdminBundleRow = {
   customer_id: string
   customer_name: string
   email: string
-  delivery_date: string
+  delivery_date: string // ISO date string (YYYY-MM-DD)
   created_at: string
 }
 
@@ -35,8 +33,15 @@ type BundlesResponse = {
    Helpers
 ======================= */
 
-const formatDate = (date: Date) =>
-  date.toISOString().split("T")[0]
+const formatDate = (value?: string) => {
+  if (!value) return "—"
+  const date = new Date(value)
+  return isNaN(date.getTime())
+    ? "—"
+    : date.toLocaleDateString()
+}
+
+const todayISO = new Date().toISOString().split("T")[0]
 
 /* =======================
    Table Columns
@@ -45,6 +50,10 @@ const formatDate = (date: Date) =>
 const columnHelper = createDataTableColumnHelper<AdminBundleRow>()
 
 const columns = [
+  columnHelper.accessor("delivery_date", {
+    header: "Delivery Date",
+    cell: ({ getValue }) => formatDate(getValue()),
+  }),
   columnHelper.accessor("customer_name", {
     header: "Customer",
     cell: ({ getValue }) => getValue() || "—",
@@ -55,15 +64,9 @@ const columns = [
   columnHelper.accessor("bundle_name", {
     header: "Bundle",
   }),
-  columnHelper.accessor("delivery_date", {
-    header: "Delivery Date",
-    cell: ({ getValue }) =>
-      new Date(getValue()).toLocaleDateString(),
-  }),
   columnHelper.accessor("created_at", {
     header: "Created",
-    cell: ({ getValue }) =>
-      new Date(getValue()).toLocaleDateString(),
+    cell: ({ getValue }) => formatDate(getValue()),
   }),
 ]
 
@@ -74,16 +77,14 @@ const columns = [
 const AdminBundlesPage = () => {
   const limit = 15
 
+  const [selectedDate, setSelectedDate] =
+    useState<string>(todayISO)
+
   const [pagination, setPagination] =
     useState<DataTablePaginationState>({
       pageIndex: 0,
       pageSize: limit,
     })
-
-  // Default to TODAY
-  const [selectedDate, setSelectedDate] = useState(
-    formatDate(new Date())
-  )
 
   const offset = useMemo(
     () => pagination.pageIndex * limit,
@@ -91,7 +92,12 @@ const AdminBundlesPage = () => {
   )
 
   const { data, isLoading } = useQuery({
-    queryKey: ["admin-bundles", selectedDate, limit, offset],
+    queryKey: [
+      "admin-bundles",
+      selectedDate,
+      limit,
+      offset,
+    ],
     queryFn: async () => {
       const params = new URLSearchParams({
         limit: String(limit),
@@ -105,11 +111,12 @@ const AdminBundlesPage = () => {
       )
 
       if (!res.ok) {
-        throw new Error("Failed to load deliveries")
+        throw new Error("Failed to load bundles")
       }
 
       return res.json() as Promise<BundlesResponse>
     },
+    keepPreviousData: true,
   })
 
   const table = useDataTable({
@@ -125,38 +132,29 @@ const AdminBundlesPage = () => {
   })
 
   return (
-    <Container className="p-0">
+    <Container className="divide-y p-0">
       <DataTable instance={table}>
-        {/* Header */}
-        <DataTable.Toolbar className="flex flex-col gap-4 px-6 py-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
+        <DataTable.Toolbar className="flex items-center justify-between px-6 py-4">
+          <div className="space-y-1">
             <Heading level="h1">
               Deliveries for{" "}
-              {new Date(selectedDate).toLocaleDateString()}
+              {formatDate(selectedDate)}
             </Heading>
-            <p className="text-sm text-ui-fg-muted">
-              Customer bundles scheduled for this date
-            </p>
           </div>
 
           {/* Date Picker */}
-          <div className="flex items-center gap-3">
-            <label className="text-sm font-medium text-ui-fg-subtle">
-              Delivery date
-            </label>
-            <input
-              type="date"
-              value={selectedDate}
-              onChange={(e) => {
-                setSelectedDate(e.target.value)
-                setPagination((prev) => ({
-                  ...prev,
-                  pageIndex: 0,
-                }))
-              }}
-              className="rounded-md border px-3 py-1 text-sm"
-            />
-          </div>
+          <input
+            type="date"
+            value={selectedDate}
+            onChange={(e) => {
+              setSelectedDate(e.target.value)
+              setPagination((prev) => ({
+                ...prev,
+                pageIndex: 0,
+              }))
+            }}
+            className="rounded-md border px-3 py-1 text-sm"
+          />
         </DataTable.Toolbar>
 
         <DataTable.Table />
