@@ -43,21 +43,21 @@ type AdminBundleRow = {
 const getNextDeliveryDate = (schedule: DeliverySchedule): Date | null => {
   if (!schedule) return null
   const { day_of_month, interval_count, start_date } = schedule
+  if (interval_count <= 0 || !Number.isInteger(interval_count) || day_of_month < 1 || day_of_month > 31) return null
   const today = new Date()
+  today.setHours(0, 0, 0, 0)
   let current = new Date(start_date)
   if (isNaN(current.getTime())) return null
-
+  current.setHours(0, 0, 0, 0)
   // Set initial delivery to day_of_month in start month, clamped to last day of month
   let lastDay = new Date(current.getFullYear(), current.getMonth() + 1, 0).getDate()
   current.setDate(Math.min(day_of_month, lastDay))
-
   // Advance by interval_count months until we find a date in the future (or today)
   while (current < today) {
     current.setMonth(current.getMonth() + interval_count)
     lastDay = new Date(current.getFullYear(), current.getMonth() + 1, 0).getDate()
     current.setDate(Math.min(day_of_month, lastDay))
   }
-
   return current
 }
 /* =======================
