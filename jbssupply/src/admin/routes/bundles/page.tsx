@@ -41,26 +41,34 @@ type AdminBundleRow = {
    Helpers
 ======================= */
 
-function getNextDeliveryDate(schedule: DeliverySchedule): string {
-  if (!schedule) return "N/A"
+const getNextDeliveryDate = (schedule: DeliverySchedule): Date | null => {
+  if (!schedule) return null;
 
-  const { interval_count, day_of_month, start_date } = schedule
-  const today = new Date()
-  const start = new Date(start_date)
+  const { interval_count, day_of_month, start_date } = schedule;
 
-  if (isNaN(start.getTime())) return "Invalid date"
+  const start = new Date(start_date);
+  if (isNaN(start.getTime())) return null;
 
-  let current = new Date(start)
-  current.setDate(Math.min(day_of_month, 28))
+  const today = new Date();
+  let next = new Date(start);
 
-  while (current < today) {
-    current.setMonth(current.getMonth() + interval_count)
+  // Ensure the day is valid (1–28) to prevent invalid dates
+  next.setDate(Math.min(day_of_month, 28));
+
+  // Increment months until the date is today or in the future
+  while (next < today) {
+    const currentMonth = next.getMonth();
+    next.setMonth(currentMonth + interval_count);
+
+    // If month overflowed and date changed unexpectedly, normalize it
+    if (next.getDate() !== Math.min(day_of_month, 28)) {
+      next.setDate(Math.min(day_of_month, 28));
+    }
   }
 
-  return isNaN(current.getTime())
-    ? "Invalid date"
-    : current.toLocaleDateString()
-}
+  return next;
+};
+
 
 /* =======================
    Table Columns
