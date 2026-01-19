@@ -42,8 +42,10 @@ type AdminBundleRow = {
 ======================= */
 
 /**
- * SAME logic as frontend
- * Determines next delivery date from today
+ * Calculate next delivery date based on:
+ * - interval_count in months
+ * - day_of_month
+ * - start_date
  */
 function getNextDeliveryDate(
   schedule: DeliverySchedule
@@ -51,12 +53,10 @@ function getNextDeliveryDate(
   if (!schedule) return null
 
   const { interval_count, day_of_month, start_date } = schedule
-
   const today = new Date()
   let current = new Date(start_date)
 
   if (isNaN(current.getTime())) return null
-
   current.setDate(Math.min(day_of_month, 28))
 
   while (current < today) {
@@ -77,19 +77,13 @@ const columnHelper =
 
 const columns = [
   columnHelper.accessor("next_delivery_date", {
-    header: "Delivery Date",
+    header: "Next Delivery",
     cell: ({ getValue }) =>
       new Date(getValue()).toLocaleDateString(),
   }),
-  columnHelper.accessor("customer_name", {
-    header: "Customer",
-  }),
-  columnHelper.accessor("email", {
-    header: "Email",
-  }),
-  columnHelper.accessor("bundle_name", {
-    header: "Bundle",
-  }),
+  columnHelper.accessor("customer_name", { header: "Customer" }),
+  columnHelper.accessor("email", { header: "Email" }),
+  columnHelper.accessor("bundle_name", { header: "Bundle" }),
   columnHelper.accessor("items", {
     header: "Products",
     cell: ({ getValue }) => (
@@ -109,11 +103,7 @@ const columns = [
 ======================= */
 
 const AdminBundlesPage = () => {
-  const limit = 20
-
-  const todayISO = new Date().toISOString().slice(0, 10)
-  const [selectedDate, setSelectedDate] =
-    useState<string>(todayISO)
+  const limit = 50
 
   const [pagination, setPagination] =
     useState<DataTablePaginationState>({
@@ -130,41 +120,23 @@ const AdminBundlesPage = () => {
         credentials: "include",
       })
 
-      if (!res.ok) {
-        throw new Error("Failed to load bundles")
-      }
-
-      return res.json() as Promise<{
-        bundles: AdminBundleRow[]
-      }>
+      if (!res.ok) throw new Error("Failed to load bundles")
+      return res.json() as Promise<{ bundles: AdminBundleRow[] }>
     },
   })
 
   /* =======================
-     Transform + Filter
-  ===================== */
+     Transform bundles with next delivery
+  ======================== */
 
   const rows = useMemo(() => {
     if (!data?.bundles) return []
 
-    return data.bundles
-      .map((bundle) => {
-        const nextDelivery = getNextDeliveryDate(
-          bundle.delivery_schedule
-        )
-
-        if (!nextDelivery) return null
-
-        return {
-          ...bundle,
-          next_delivery_date: nextDelivery,
-        }
-      })
-      .filter(
-        (b): b is AdminBundleRow & { next_delivery_date: string } =>
-          Boolean(b) && b.next_delivery_date === selectedDate
-      )
-  }, [data, selectedDate])
+    return data.bundles.map((bundle) => ({
+      ...bundle,
+      next_delivery_date: getNextDeliveryDate(bundle.delivery_schedule) || "",
+    }))
+  }, [data])
 
   const table = useDataTable({
     columns,
@@ -178,32 +150,11 @@ const AdminBundlesPage = () => {
     },
   })
 
-  /* =======================
-     UI
-  ===================== */
-
   return (
     <Container className="divide-y p-0">
       <DataTable instance={table}>
-        <DataTable.Toolbar className="flex flex-col gap-4 px-6 py-4 sm:flex-row sm:items-center sm:justify-between">
-          <Heading level="h1">
-            Deliveries for{" "}
-            {new Date(selectedDate).toLocaleDateString()}
-          </Heading>
-
-          {/* Date Picker */}
-          <input
-            type="date"
-            value={selectedDate}
-            onChange={(e) => {
-              setSelectedDate(e.target.value)
-              setPagination((p) => ({
-                ...p,
-                pageIndex: 0,
-              }))
-            }}
-            className="rounded-md border px-3 py-1 text-sm"
-          />
+        <DataTable.Toolbar className="flex items-center justify-between px-6 py-4">
+          <Heading level="h1">All Bundle Deliveries</Heading>
         </DataTable.Toolbar>
 
         <DataTable.Table />
