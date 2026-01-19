@@ -7,7 +7,6 @@ import {
   createDataTableColumnHelper,
   useDataTable,
   DataTablePaginationState,
-  Badge,
 } from "@medusajs/ui"
 import { defineRouteConfig } from "@medusajs/admin-sdk"
 import { useQuery } from "@tanstack/react-query"
@@ -17,9 +16,16 @@ import { useMemo, useState } from "react"
    Types
 ======================= */
 
-type BundleProduct = {
-  title: string
+type BundleItem = {
+  product_title: string
   quantity: number
+}
+
+type DeliverySchedule = {
+  interval_type: "months"
+  interval_count: number
+  day_of_month: number
+  start_date: string
 }
 
 type AdminBundleRow = {
@@ -27,62 +33,87 @@ type AdminBundleRow = {
   bundle_name: string
   customer_name: string
   email: string
-  next_delivery_date?: string
-  products?: BundleProduct[]
-}
-
-type BundlesResponse = {
-  bundles: AdminBundleRow[]
+  items: BundleItem[]
+  delivery_schedule: DeliverySchedule
 }
 
 /* =======================
-   Columns
+   Helpers
+======================= */
+
+/**
+ * SAME logic as frontend
+ * Determines next delivery date from today
+ */
+function getNextDeliveryDate(
+  schedule: DeliverySchedule
+): string | null {
+  if (!schedule) return null
+
+  const { interval_count, day_of_month, start_date } = schedule
+
+  const today = new Date()
+  let current = new Date(start_date)
+
+  if (isNaN(current.getTime())) return null
+
+  current.setDate(Math.min(day_of_month, 28))
+
+  while (current < today) {
+    current.setMonth(current.getMonth() + interval_count)
+  }
+
+  return isNaN(current.getTime())
+    ? null
+    : current.toISOString().slice(0, 10)
+}
+
+/* =======================
+   Table Columns
 ======================= */
 
 const columnHelper =
-  createDataTableColumnHelper<AdminBundleRow>()
+  createDataTableColumnHelper<AdminBundleRow & { next_delivery_date: string }>()
 
 const columns = [
+  columnHelper.accessor("next_delivery_date", {
+    header: "Delivery Date",
+    cell: ({ getValue }) =>
+      new Date(getValue()).toLocaleDateString(),
+  }),
   columnHelper.accessor("customer_name", {
     header: "Customer",
-    cell: ({ getValue }) => getValue() || "—",
   }),
   columnHelper.accessor("email", {
     header: "Email",
-    cell: ({ getValue }) => getValue() || "—",
   }),
   columnHelper.accessor("bundle_name", {
     header: "Bundle",
-    cell: ({ getValue }) => getValue() || "—",
   }),
-  columnHelper.accessor("products", {
+  columnHelper.accessor("items", {
     header: "Products",
-    cell: ({ getValue }) => {
-      const products = getValue() ?? []
-
-      if (!products.length) {
-        return <span className="text-ui-fg-muted">—</span>
-      }
-
-      return (
-        <div className="flex flex-col gap-1">
-          {products.map((p, i) => (
-            <Badge key={i} size="small">
-              {p.title} × {p.quantity}
-            </Badge>
-          ))}
-        </div>
-      )
-    },
+    cell: ({ getValue }) => (
+      <ul className="space-y-1">
+        {getValue().map((item, idx) => (
+          <li key={idx} className="text-sm">
+            {item.quantity} × {item.product_title}
+          </li>
+        ))}
+      </ul>
+    ),
   }),
 ]
 
 /* =======================
-   Page
+   Page Component
 ======================= */
 
 const AdminBundlesPage = () => {
   const limit = 20
+
+  const todayISO = new Date().toISOString().slice(0, 10)
+  const [selectedDate, setSelectedDate] =
+    useState<string>(todayISO)
 
   const [pagination, setPagination] =
     useState<DataTablePaginationState>({
@@ -90,9 +121,7 @@ const AdminBundlesPage = () => {
       pageSize: limit,
     })
 
-  const [selectedDate, setSelectedDate] = useState(
-    new Date().toISOString().split("T")[0]
-  )
+  const offset = pagination.pageIndex * limit
 
   const { data, isLoading } = useQuery({
     queryKey: ["admin-bundles"],
@@ -105,26 +134,42 @@ const AdminBundlesPage = () => {
         throw new Error("Failed to load bundles")
       }
 
-      return res.json() as Promise<BundlesResponse>
+      return res.json() as Promise<{
+        bundles: AdminBundleRow[]
+      }>
     },
   })
 
-  const filteredBundles = useMemo(() => {
+  /* =======================
+     Transform + Filter
+  ===================== */
+
+  const rows = useMemo(() => {
     if (!data?.bundles) return []
 
-    return data.bundles.filter((bundle) => {
-      if (!bundle.next_delivery_date) return false
+    return data.bundles
+      .map((bundle) => {
+        const nextDelivery = getNextDeliveryDate(
+          bundle.delivery_schedule
+        )
 
-      return (
-        bundle.next_delivery_date === selectedDate
+        if (!nextDelivery) return null
+
+        return {
+          ...bundle,
+          next_delivery_date: nextDelivery,
+        }
+      })
+      .filter(
+        (b): b is AdminBundleRow & { next_delivery_date: string } =>
+          Boolean(b) && b.next_delivery_date === selectedDate
       )
-    })
   }, [data, selectedDate])
 
   const table = useDataTable({
     columns,
-    data: filteredBundles,
-    rowCount: filteredBundles.length,
+    data: rows,
+    rowCount: rows.length,
     isLoading,
     getRowId: (row) => row.bundle_id,
     pagination: {
@@ -133,31 +178,32 @@ const AdminBundlesPage = () => {
     },
   })
 
+  /* =======================
+     UI
+  ===================== */
+
   return (
-    <Container className="p-0 divide-y">
+    <Container className="divide-y p-0">
       <DataTable instance={table}>
-        <DataTable.Toolbar className="flex items-center justify-between px-6 py-4">
+        <DataTable.Toolbar className="flex flex-col gap-4 px-6 py-4 sm:flex-row sm:items-center sm:justify-between">
           <Heading level="h1">
-            Deliveries by Date
+            Deliveries for{" "}
+            {new Date(selectedDate).toLocaleDateString()}
           </Heading>
 
-          <div className="flex items-center gap-3">
-            <span className="text-sm text-ui-fg-muted">
-              Delivery date
-            </span>
-            <input
-              type="date"
-              value={selectedDate}
-              onChange={(e) => {
-                setSelectedDate(e.target.value)
-                setPagination((p) => ({
-                  ...p,
-                  pageIndex: 0,
-                }))
-              }}
-              className="rounded-md border px-3 py-1 text-sm"
-            />
-          </div>
+          {/* Date Picker */}
+          <input
+            type="date"
+            value={selectedDate}
+            onChange={(e) => {
+              setSelectedDate(e.target.value)
+              setPagination((p) => ({
+                ...p,
+                pageIndex: 0,
+              }))
+            }}
+            className="rounded-md border px-3 py-1 text-sm"
+          />
         </DataTable.Toolbar>
 
         <DataTable.Table />
@@ -168,7 +214,7 @@ const AdminBundlesPage = () => {
 }
 
 /* =======================
-   Navigation
+   Admin Navigation
 ======================= */
 
 export const config = defineRouteConfig({
