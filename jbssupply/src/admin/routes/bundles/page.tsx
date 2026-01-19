@@ -41,34 +41,32 @@ type AdminBundleRow = {
    Helpers
 ======================= */
 
+/**
+ * Calculate the next delivery date based on:
+ * - day_of_month
+ * - interval_count (in months)
+ * Ignores start_date except for month normalization
+ */
 const getNextDeliveryDate = (schedule: DeliverySchedule): Date | null => {
-  if (!schedule) return null;
+  if (!schedule) return null
 
-  const { interval_count, day_of_month, start_date } = schedule;
+  const { day_of_month, interval_count, start_date } = schedule
 
-  const start = new Date(start_date);
-  if (isNaN(start.getTime())) return null;
+  const today = new Date()
+  const start = new Date(start_date)
+  if (isNaN(start.getTime())) return null
 
-  const today = new Date();
-  let next = new Date(start);
+  // Candidate date = this month, day_of_month
+  let next = new Date(today.getFullYear(), today.getMonth(), Math.min(day_of_month, 28))
 
-  // Ensure the day is valid (1–28) to prevent invalid dates
-  next.setDate(Math.min(day_of_month, 28));
-
-  // Increment months until the date is today or in the future
+  // If already passed, add interval_count months until it's in the future
   while (next < today) {
-    const currentMonth = next.getMonth();
-    next.setMonth(currentMonth + interval_count);
-
-    // If month overflowed and date changed unexpectedly, normalize it
-    if (next.getDate() !== Math.min(day_of_month, 28)) {
-      next.setDate(Math.min(day_of_month, 28));
-    }
+    next.setMonth(next.getMonth() + interval_count)
+    next.setDate(Math.min(day_of_month, 28))
   }
 
-  return next;
-};
-
+  return next
+}
 
 /* =======================
    Table Columns
@@ -80,7 +78,7 @@ const columnHelper =
 const columns = [
   columnHelper.accessor("next_delivery", {
     header: "Next Delivery",
-    cell: ({ getValue }) => getValue() || "N/A",
+    cell: ({ getValue }) => getValue || "N/A",
   }),
   columnHelper.accessor("customer_name", { header: "Customer" }),
   columnHelper.accessor("email", { header: "Email" }),
@@ -88,7 +86,7 @@ const columns = [
   columnHelper.accessor("items", {
     header: "Products",
     cell: ({ getValue }) =>
-      Array.isArray(getValue()) && getValue().length > 0 ? (
+      Array.isArray(getValue()) && getValue.length > 0 ? (
         <ul className="space-y-1">
           {getValue().map((item, idx) => (
             <li key={idx} className="text-sm">
@@ -114,6 +112,7 @@ const AdminBundlesPage = () => {
       pageSize: limit,
     })
 
+  // Fetch all bundles from your backend
   const { data, isLoading, error } = useQuery({
     queryKey: ["admin-bundles"],
     queryFn: async () => {
@@ -125,16 +124,17 @@ const AdminBundlesPage = () => {
     },
   })
 
-  if (error) {
-    console.error(error)
-  }
+  if (error) console.error(error)
 
+  // Add next_delivery string to each row
   const rows = useMemo(() => {
     if (!data?.bundles) return []
 
     return data.bundles.map((b) => ({
       ...b,
-      next_delivery: getNextDeliveryDate(b.delivery_schedule),
+      next_delivery: b.delivery_schedule
+        ? getNextDeliveryDate(b.delivery_schedule)?.toLocaleDateString() ?? "N/A"
+        : "N/A",
     }))
   }, [data])
 
