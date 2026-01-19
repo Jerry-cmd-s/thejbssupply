@@ -5,6 +5,7 @@ import {
   createDataTableColumnHelper,
   useDataTable,
   DataTablePaginationState,
+  Badge,
 } from "@medusajs/ui"
 import { defineRouteConfig } from "@medusajs/admin-sdk"
 import { useQuery } from "@tanstack/react-query"
@@ -14,13 +15,25 @@ import { useMemo, useState } from "react"
    Types
 ======================= */
 
+type BundleProduct = {
+  title: string
+  quantity: number
+}
+
+type BundleSchedule = {
+  start_date: string
+  interval_type: "months"
+  interval_count: number
+  day_of_month: number
+}
+
 type AdminBundleRow = {
   bundle_id: string
   bundle_name: string
-  customer_id: string
   customer_name: string
   email: string
-  delivery_date: string // ISO date string (YYYY-MM-DD)
+  products: BundleProduct[]
+  schedule: BundleSchedule
   created_at: string
 }
 
@@ -33,30 +46,39 @@ type BundlesResponse = {
    Helpers
 ======================= */
 
-const formatDate = (value?: string) => {
-  if (!value) return "—"
-  const date = new Date(value)
-  return isNaN(date.getTime())
-    ? "—"
-    : date.toLocaleDateString()
-}
+const isSameDay = (a: Date, b: Date) =>
+  a.getFullYear() === b.getFullYear() &&
+  a.getMonth() === b.getMonth() &&
+  a.getDate() === b.getDate()
 
-const todayISO = new Date().toISOString().split("T")[0]
+const bundleDeliversOnDate = (
+  schedule: BundleSchedule,
+  selectedDate: Date
+) => {
+  const start = new Date(schedule.start_date)
+  if (selectedDate < start) return false
+
+  if (schedule.interval_type !== "months") return false
+
+  const monthDiff =
+    (selectedDate.getFullYear() - start.getFullYear()) * 12 +
+    (selectedDate.getMonth() - start.getMonth())
+
+  if (monthDiff % schedule.interval_count !== 0) return false
+
+  return selectedDate.getDate() === schedule.day_of_month
+}
 
 /* =======================
    Table Columns
 ======================= */
 
-const columnHelper = createDataTableColumnHelper<AdminBundleRow>()
+const columnHelper =
+  createDataTableColumnHelper<AdminBundleRow>()
 
 const columns = [
-  columnHelper.accessor("delivery_date", {
-    header: "Delivery Date",
-    cell: ({ getValue }) => formatDate(getValue()),
-  }),
   columnHelper.accessor("customer_name", {
     header: "Customer",
-    cell: ({ getValue }) => getValue() || "—",
   }),
   columnHelper.accessor("email", {
     header: "Email",
@@ -64,9 +86,22 @@ const columns = [
   columnHelper.accessor("bundle_name", {
     header: "Bundle",
   }),
-  columnHelper.accessor("created_at", {
-    header: "Created",
-    cell: ({ getValue }) => formatDate(getValue()),
+  columnHelper.accessor("products", {
+    header: "Products",
+    cell: ({ getValue }) => (
+      <div className="flex flex-col gap-1">
+        {getValue().map((p, i) => (
+          <Badge key={i} size="small">
+            {p.title} × {p.quantity}
+          </Badge>
+        ))}
+      </div>
+    ),
+  }),
+  columnHelper.accessor("schedule.start_date", {
+    header: "Start Date",
+    cell: ({ getValue }) =>
+      new Date(getValue()).toLocaleDateString(),
   }),
 ]
 
@@ -75,10 +110,11 @@ const columns = [
 ======================= */
 
 const AdminBundlesPage = () => {
-  const limit = 15
+  const limit = 20
 
-  const [selectedDate, setSelectedDate] =
-    useState<string>(todayISO)
+  const [selectedDate, setSelectedDate] = useState(
+    new Date().toISOString().split("T")[0]
+  )
 
   const [pagination, setPagination] =
     useState<DataTablePaginationState>({
@@ -86,29 +122,15 @@ const AdminBundlesPage = () => {
       pageSize: limit,
     })
 
-  const offset = useMemo(
-    () => pagination.pageIndex * limit,
-    [pagination.pageIndex]
-  )
+  const offset =
+    pagination.pageIndex * pagination.pageSize
 
   const { data, isLoading } = useQuery({
-    queryKey: [
-      "admin-bundles",
-      selectedDate,
-      limit,
-      offset,
-    ],
+    queryKey: ["admin-bundles"],
     queryFn: async () => {
-      const params = new URLSearchParams({
-        limit: String(limit),
-        offset: String(offset),
-        delivery_date: selectedDate,
+      const res = await fetch("/admin/bundles", {
+        credentials: "include",
       })
-
-      const res = await fetch(
-        `/admin/bundles?${params.toString()}`,
-        { credentials: "include" }
-      )
 
       if (!res.ok) {
         throw new Error("Failed to load bundles")
@@ -116,13 +138,22 @@ const AdminBundlesPage = () => {
 
       return res.json() as Promise<BundlesResponse>
     },
-    keepPreviousData: true,
   })
+
+  const filteredBundles = useMemo(() => {
+    if (!data) return []
+
+    const date = new Date(selectedDate)
+
+    return data.bundles.filter((bundle) =>
+      bundleDeliversOnDate(bundle.schedule, date)
+    )
+  }, [data, selectedDate])
 
   const table = useDataTable({
     columns,
-    data: data?.bundles ?? [],
-    rowCount: data?.count ?? 0,
+    data: filteredBundles,
+    rowCount: filteredBundles.length,
     isLoading,
     getRowId: (row) => row.bundle_id,
     pagination: {
@@ -132,28 +163,24 @@ const AdminBundlesPage = () => {
   })
 
   return (
-    <Container className="divide-y p-0">
+    <Container className="p-0 divide-y">
       <DataTable instance={table}>
         <DataTable.Toolbar className="flex items-center justify-between px-6 py-4">
-          <div className="space-y-1">
-            <Heading level="h1">
-              Deliveries for{" "}
-              {formatDate(selectedDate)}
-            </Heading>
-          </div>
+          <Heading level="h1">
+            Delivery Schedule
+          </Heading>
 
-          {/* Date Picker */}
           <input
             type="date"
+            className="rounded-md border px-3 py-1 text-sm"
             value={selectedDate}
             onChange={(e) => {
               setSelectedDate(e.target.value)
-              setPagination((prev) => ({
-                ...prev,
+              setPagination((p) => ({
+                ...p,
                 pageIndex: 0,
               }))
             }}
-            className="rounded-md border px-3 py-1 text-sm"
           />
         </DataTable.Toolbar>
 
@@ -169,7 +196,7 @@ const AdminBundlesPage = () => {
 ======================= */
 
 export const config = defineRouteConfig({
-  label: "Delivery Schedule",
+  label: "Bundle Deliveries",
 })
 
 export default AdminBundlesPage
