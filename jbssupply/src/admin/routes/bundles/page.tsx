@@ -48,22 +48,23 @@ const getNextDeliveryDate = (
 
   const { interval_count, day_of_month, start_date } = schedule
 
+  if (!start_date) return null // Cannot calculate without a start date
+
   const start = new Date(start_date)
   if (isNaN(start.getTime())) return null
 
   const today = new Date()
   let current = new Date(start)
 
-  // EXACT frontend behavior:
-  // - Cap day at 28
-  // - Do not validate interval
-  current.setDate(Math.min(day_of_month, 28))
+  // Cap day at 28 (like frontend) to avoid month overflow
+  current.setDate(Math.min(day_of_month ?? 1, 28))
 
+  // Loop forward until next delivery is today or in the future
   while (current < today) {
-    current.setMonth(current.getMonth() + interval_count)
+    current.setMonth(current.getMonth() + (interval_count ?? 1))
   }
 
-  return isNaN(current.getTime()) ? null : current
+  return current
 }
 
 /* =======================
