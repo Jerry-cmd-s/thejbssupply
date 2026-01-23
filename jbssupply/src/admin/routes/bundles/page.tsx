@@ -1,4 +1,5 @@
 "use client"
+
 import {
   Container,
   DataTable,
@@ -10,19 +11,23 @@ import {
 import { defineRouteConfig } from "@medusajs/admin-sdk"
 import { useQuery } from "@tanstack/react-query"
 import { useMemo, useState } from "react"
+
 /* =======================
    Types
 ======================= */
+
 type BundleItem = {
   product_title: string
   quantity: number
 }
+
 type DeliverySchedule = {
   interval_type: "months"
   interval_count: number
   day_of_month: number
   start_date: string
 }
+
 type AdminBundleRow = {
   bundle_id: string
   bundle_name: string
@@ -31,67 +36,59 @@ type AdminBundleRow = {
   items: BundleItem[]
   delivery_schedule: DeliverySchedule
 }
-/**
- * Calculate the next delivery date based on:
- * - day_of_month
- * - interval_count (in months)
- * - Anchored to start_date
- */
-const getNextDeliveryDate = (schedule?: DeliverySchedule): Date | null => {
+
+/* =======================
+   Frontend-Aligned Date Logic
+======================= */
+
+const getNextDeliveryDate = (
+  schedule?: DeliverySchedule | null
+): Date | null => {
   if (!schedule) return null
 
-  const interval = Number(schedule.interval_count)
-  const day = Number(schedule.day_of_month)
+  const { interval_count, day_of_month, start_date } = schedule
 
-  if (!interval || interval <= 0 || !day || day < 1 || day > 31) {
-    console.warn("Invalid delivery schedule:", schedule)
-    return null
-  }
+  const start = new Date(start_date)
+  if (isNaN(start.getTime())) return null
 
   const today = new Date()
-  today.setHours(0, 0, 0, 0)
-
-  const start = schedule.start_date
-    ? new Date(schedule.start_date)
-    : new Date()
-
-  if (isNaN(start.getTime())) {
-    console.error("Invalid start_date:", schedule.start_date)
-    return null
-  }
-
   let current = new Date(start)
-  current.setHours(0, 0, 0, 0)
 
-  // Anchor to the intended delivery day
-  const clampDay = (d: Date) => {
-    const lastDay = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate()
-    d.setDate(Math.min(day, lastDay))
-  }
-
-  clampDay(current)
+  // EXACT frontend behavior:
+  // - Cap day at 28
+  // - Do not validate interval
+  current.setDate(Math.min(day_of_month, 28))
 
   while (current < today) {
-    current.setMonth(current.getMonth() + interval)
-    clampDay(current)
+    current.setMonth(current.getMonth() + interval_count)
   }
 
-  return current
+  return isNaN(current.getTime()) ? null : current
 }
 
 /* =======================
    Table Columns
 ======================= */
+
 const columnHelper =
-  createDataTableColumnHelper<AdminBundleRow & { next_delivery: string }>()
+  createDataTableColumnHelper<
+    AdminBundleRow & { next_delivery: string }
+  >()
+
 const columns = [
   columnHelper.accessor("next_delivery", {
     header: "Next Delivery",
-    cell: ({ getValue }) => getValue() || "N/A",
+    cell: ({ getValue }) => getValue(),
   }),
-  columnHelper.accessor("customer_name", { header: "Customer" }),
-  columnHelper.accessor("email", { header: "Email" }),
-  columnHelper.accessor("bundle_name", { header: "Bundle" }),
+  columnHelper.accessor("customer_name", {
+    header: "Customer",
+  }),
+  columnHelper.accessor("email", {
+    header: "Email",
+  }),
+  columnHelper.accessor("bundle_name", {
+    header: "Bundle",
+  }),
   columnHelper.accessor("items", {
     header: "Products",
     cell: ({ getValue }) =>
@@ -108,9 +105,11 @@ const columns = [
       ),
   }),
 ]
+
 /* =======================
-   Admin Page Component
+   Page Component
 ======================= */
+
 const AdminBundlesPage = () => {
   const limit = 50
 
@@ -138,22 +137,22 @@ const AdminBundlesPage = () => {
   })
 
   if (error) {
-    console.error("Bundles fetch error:", error)
+    console.error("Admin bundles fetch error:", error)
   }
 
   const rows = useMemo(() => {
     if (!data?.bundles) return []
 
     return data.bundles.map((bundle) => {
-      const nextDate = getNextDeliveryDate(
+      const next = getNextDeliveryDate(
         bundle.delivery_schedule
       )
 
       return {
         ...bundle,
-        next_delivery: nextDate
-          ? nextDate.toLocaleDateString()
-          : "Invalid schedule",
+        next_delivery: next
+          ? next.toLocaleDateString()
+          : "Not scheduled",
       }
     })
   }, [data])
@@ -189,7 +188,9 @@ const AdminBundlesPage = () => {
 /* =======================
    Admin Navigation
 ======================= */
+
 export const config = defineRouteConfig({
   label: "Bundle Deliveries",
 })
+
 export default AdminBundlesPage
