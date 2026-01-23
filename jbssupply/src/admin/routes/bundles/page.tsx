@@ -37,48 +37,48 @@ type AdminBundleRow = {
  * - interval_count (in months)
  * - Anchored to start_date
  */
-const getNextDeliveryDate = (schedule: DeliverySchedule): Date | null => {
-  if (!schedule) return null;
-  const { day_of_month, interval_count, start_date } = schedule;
+const getNextDeliveryDate = (schedule?: DeliverySchedule): Date | null => {
+  if (!schedule) return null
 
-  // Optional/loose validation: Log issues but proceed if close to valid (adjust as needed)
-  if (interval_count <= 0 || day_of_month < 1 || day_of_month > 31) {
-    console.warn(`Invalid schedule: interval=${interval_count}, day=${day_of_month}`);
-    return null; // Or remove this to proceed like front-end
-  }
-  if (!Number.isInteger(interval_count)) {
-    console.warn(`Non-integer interval_count: ${interval_count}`);
-    // Optionally: Math.round(interval_count) and proceed
-    return null;
+  const interval = Number(schedule.interval_count)
+  const day = Number(schedule.day_of_month)
+
+  if (!interval || interval <= 0 || !day || day < 1 || day > 31) {
+    console.warn("Invalid delivery schedule:", schedule)
+    return null
   }
 
-  const today = new Date();
-  today.setHours(0, 0, 0, 0); // Normalize to start of day (local time)
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
 
-  let current = new Date(start_date);
-  if (isNaN(current.getTime())) {
-    console.error(`Invalid start_date: ${start_date}`);
-    return null;
+  const start = schedule.start_date
+    ? new Date(schedule.start_date)
+    : new Date()
+
+  if (isNaN(start.getTime())) {
+    console.error("Invalid start_date:", schedule.start_date)
+    return null
   }
-  current.setHours(0, 0, 0, 0);
 
-  // Set initial delivery to day_of_month in start month, clamped to last day
-  let lastDay = new Date(current.getFullYear(), current.getMonth() + 1, 0).getDate();
-  current.setDate(Math.min(day_of_month, lastDay));
+  let current = new Date(start)
+  current.setHours(0, 0, 0, 0)
 
-  // Advance by interval_count months until in the future or today
+  // Anchor to the intended delivery day
+  const clampDay = (d: Date) => {
+    const lastDay = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate()
+    d.setDate(Math.min(day, lastDay))
+  }
+
+  clampDay(current)
+
   while (current < today) {
-    current.setMonth(current.getMonth() + interval_count);
-    lastDay = new Date(current.getFullYear(), current.getMonth() + 1, 0).getDate();
-    current.setDate(Math.min(day_of_month, lastDay));
+    current.setMonth(current.getMonth() + interval)
+    clampDay(current)
   }
 
-  if (isNaN(current.getTime())) {
-    console.error('NaN after calculation');
-    return null;
-  }
-  return current;
-};
+  return current
+}
+
 /* =======================
    Table Columns
 ======================= */
@@ -113,33 +113,51 @@ const columns = [
 ======================= */
 const AdminBundlesPage = () => {
   const limit = 50
+
   const [pagination, setPagination] =
     useState<DataTablePaginationState>({
       pageIndex: 0,
       pageSize: limit,
     })
-  // Fetch all bundles from your backend
+
   const { data, isLoading, error } = useQuery({
     queryKey: ["admin-bundles"],
     queryFn: async () => {
       const res = await fetch("/admin/bundles", {
         credentials: "include",
       })
-      if (!res.ok) throw new Error("Failed to fetch bundles")
-      return res.json() as Promise<{ bundles: AdminBundleRow[] }>
+
+      if (!res.ok) {
+        throw new Error("Failed to fetch bundles")
+      }
+
+      return res.json() as Promise<{
+        bundles: AdminBundleRow[]
+      }>
     },
   })
-  if (error) console.error(error)
-  // Add next_delivery string to each row
+
+  if (error) {
+    console.error("Bundles fetch error:", error)
+  }
+
   const rows = useMemo(() => {
     if (!data?.bundles) return []
-    return data.bundles.map((b) => ({
-      ...b,
-      next_delivery: b.delivery_schedule
-        ? getNextDeliveryDate(b.delivery_schedule)?.toLocaleDateString() ?? "N/A"
-        : "N/A",
-    }))
+
+    return data.bundles.map((bundle) => {
+      const nextDate = getNextDeliveryDate(
+        bundle.delivery_schedule
+      )
+
+      return {
+        ...bundle,
+        next_delivery: nextDate
+          ? nextDate.toLocaleDateString()
+          : "Invalid schedule",
+      }
+    })
   }, [data])
+
   const table = useDataTable({
     columns,
     data: rows,
@@ -151,18 +169,23 @@ const AdminBundlesPage = () => {
       onPaginationChange: setPagination,
     },
   })
+
   return (
     <Container className="divide-y p-0">
       <DataTable instance={table}>
         <DataTable.Toolbar className="flex items-center justify-between px-6 py-4">
-          <Heading level="h1">All Bundle Deliveries</Heading>
+          <Heading level="h1">
+            All Bundle Deliveries
+          </Heading>
         </DataTable.Toolbar>
+
         <DataTable.Table />
         <DataTable.Pagination />
       </DataTable>
     </Container>
   )
 }
+
 /* =======================
    Admin Navigation
 ======================= */
