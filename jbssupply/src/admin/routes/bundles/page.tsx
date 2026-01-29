@@ -41,30 +41,28 @@ type AdminBundleRow = {
    Frontend-Aligned Date Logic
 ======================= */
 
-const getNextDeliveryDate = (
-  schedule?: DeliverySchedule | null
-): Date | null => {
-  if (!schedule) return null
-
-  const { interval_count, day_of_month, start_date } = schedule
-
-  if (!start_date) return null // Cannot calculate without a start date
-
-  const start = new Date(start_date)
-  if (isNaN(start.getTime())) return null
-
-  const today = new Date()
-  let current = new Date(start)
-
-  // Cap day at 28 (like frontend) to avoid month overflow
-  current.setDate(Math.min(day_of_month ?? 1, 28))
-
-  // Loop forward until next delivery is today or in the future
-  while (current < today) {
-    current.setMonth(current.getMonth() + (interval_count ?? 1))
+function getNextDeliveryDate(schedule: any): string | null {
+  if (!schedule?.day_of_month || !schedule?.interval_count) {
+    return null
   }
 
-  return current
+  const today = new Date()
+  const targetDay = Math.min(schedule.day_of_month, 28)
+
+  let next = new Date(
+    today.getFullYear(),
+    today.getMonth(),
+    targetDay
+  )
+
+  if (next < today) {
+    next.setMonth(next.getMonth() + schedule.interval_count)
+    next.setDate(targetDay)
+  }
+
+  return isNaN(next.getTime())
+    ? null
+    : next.toISOString().split("T")[0]
 }
 
 /* =======================
