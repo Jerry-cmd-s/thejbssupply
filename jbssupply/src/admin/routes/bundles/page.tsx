@@ -16,11 +16,6 @@ import { useMemo, useState } from "react"
    Types
 ======================= */
 
-type BundleItem = {
-  product_title: string
-  quantity: number
-}
-
 type DeliverySchedule = {
   interval_type: "months"
   interval_count: number
@@ -33,90 +28,63 @@ type AdminBundleRow = {
   bundle_name: string
   customer_name: string
   email: string
-  items: BundleItem[]
   delivery_schedule: DeliverySchedule
+  next_delivery: string
 }
 
 /* =======================
-   Frontend-Aligned Date Logic
+   Helpers
 ======================= */
 
-function getNextDeliveryDate(schedule: any): string | null {
-  if (!schedule?.day_of_month || !schedule?.interval_count) {
-    return null
-  }
+const getNextDeliveryDate = (schedule: DeliverySchedule): string => {
+  if (!schedule) return "N/A"
+
+  const { interval_count, day_of_month, start_date } = schedule
+
+  const start = new Date(start_date)
+  if (isNaN(start.getTime())) return "N/A"
 
   const today = new Date()
-  const targetDay = Math.min(schedule.day_of_month, 28)
+  let next = new Date(start)
 
-  let next = new Date(
-    today.getFullYear(),
-    today.getMonth(),
-    targetDay
-  )
+  // Ensure the day is valid (1–28)
+  next.setDate(Math.min(day_of_month, 28))
 
-  if (next < today) {
-    next.setMonth(next.getMonth() + schedule.interval_count)
-    next.setDate(targetDay)
+  while (next < today) {
+    next.setMonth(next.getMonth() + interval_count)
+    if (next.getDate() !== Math.min(day_of_month, 28)) {
+      next.setDate(Math.min(day_of_month, 28))
+    }
   }
 
-  return isNaN(next.getTime())
-    ? null
-    : next.toISOString().split("T")[0]
+  return next.toLocaleDateString()
 }
 
 /* =======================
    Table Columns
 ======================= */
 
-const columnHelper =
-  createDataTableColumnHelper<
-    AdminBundleRow & { next_delivery: string }
-  >()
+const columnHelper = createDataTableColumnHelper<AdminBundleRow>()
 
 const columns = [
   columnHelper.accessor("next_delivery", {
     header: "Next Delivery",
-    cell: ({ getValue }) => getValue(),
   }),
-  columnHelper.accessor("customer_name", {
-    header: "Customer",
-  }),
-  columnHelper.accessor("email", {
-    header: "Email",
-  }),
-  columnHelper.accessor("bundle_name", {
-    header: "Bundle",
-  }),
-  columnHelper.accessor("items", {
-    header: "Products",
-    cell: ({ getValue }) =>
-      Array.isArray(getValue()) && getValue().length > 0 ? (
-        <ul className="space-y-1">
-          {getValue().map((item, idx) => (
-            <li key={idx} className="text-sm">
-              {item.quantity} × {item.product_title}
-            </li>
-          ))}
-        </ul>
-      ) : (
-        "No products"
-      ),
-  }),
+  columnHelper.accessor("customer_name", { header: "Customer" }),
+  columnHelper.accessor("email", { header: "Email" }),
+  columnHelper.accessor("bundle_name", { header: "Bundle" }),
 ]
 
 /* =======================
-   Page Component
+   Admin Page Component
 ======================= */
 
 const AdminBundlesPage = () => {
   const limit = 50
-
-  const [pagination, setPagination] =
-    useState<DataTablePaginationState>({
-      pageIndex: 0,
-      pageSize: limit,
-    })
+  const [pagination, setPagination] = useState<DataTablePaginationState>({
+    pageIndex: 0,
+    pageSize: limit,
+  })
 
   const { data, isLoading, error } = useQuery({
     queryKey: ["admin-bundles"],
@@ -124,37 +92,28 @@ const AdminBundlesPage = () => {
       const res = await fetch("/admin/bundles", {
         credentials: "include",
       })
+      if (!res.ok) throw new Error("Failed to fetch bundles")
+      const json = await res.json()
 
-      if (!res.ok) {
-        throw new Error("Failed to fetch bundles")
-      }
+      // Calculate next delivery for each bundle
+      const bundles: AdminBundleRow[] = []
+      json.bundles.forEach((b: any) => {
+        const next_delivery = getNextDeliveryDate(b.delivery_schedule)
+        bundles.push({
+          ...b,
+          next_delivery,
+        })
+      })
 
-      return res.json() as Promise<{
-        bundles: AdminBundleRow[]
-      }>
+      return bundles
     },
   })
 
   if (error) {
-    console.error("Admin bundles fetch error:", error)
+    console.error(error)
   }
 
-  const rows = useMemo(() => {
-    if (!data?.bundles) return []
-
-    return data.bundles.map((bundle) => {
-      const next = getNextDeliveryDate(
-        bundle.delivery_schedule
-      )
-
-      return {
-        ...bundle,
-        next_delivery: next
-          ? next.toLocaleDateString()
-          : "Not scheduled",
-      }
-    })
-  }, [data])
+  const rows = useMemo(() => data ?? [], [data])
 
   const table = useDataTable({
     columns,
@@ -172,9 +131,7 @@ const AdminBundlesPage = () => {
     <Container className="divide-y p-0">
       <DataTable instance={table}>
         <DataTable.Toolbar className="flex items-center justify-between px-6 py-4">
-          <Heading level="h1">
-            All Bundle Deliveries
-          </Heading>
+          <Heading level="h1">All Bundle Deliveries</Heading>
         </DataTable.Toolbar>
 
         <DataTable.Table />
